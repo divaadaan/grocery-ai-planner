@@ -1,0 +1,170 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: grocery-postgres
+    environment:
+      POSTGRES_DB: grocery_planner
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d grocery_planner"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for job queuing and caching
+  redis:
+    image: redis:7-alpine
+    container_name: grocery-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Main application
+  grocery-api:
+    build:
+      context: ../../Desktop/grocery-ai-planner
+      dockerfile: backend/Dockerfile
+    container_name: grocery-api
+    ports:
+      - "8000:8000"
+      - "8001:8001"  # Prometheus metrics
+    environment:
+      # Database
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/grocery_planner
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      
+      # LLM Configuration
+      LLM_API_URL: ${LLM_API_URL:-http://host.docker.internal:11434/api/generate}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-qwen2.5-coder:14b}
+      
+      # Application
+      HOST: 0.0.0.0
+      PORT: 8000
+      LOG_LEVEL: INFO
+      DEBUG: true
+      
+      # Telemetry
+      TELEMETRY_ENABLED: true
+      TELEMETRY_METRICS_PORT: 8001
+      TELEMETRY_CONSOLE_EXPORT: true
+      
+      # External APIs (to be configured later)
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      
+    volumes:
+      - ./backend:/app
+      - ./.env:/app/.env:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Celery Worker for background tasks
+  celery-worker:
+    build:
+      context: ../../Desktop/grocery-ai-planner
+      dockerfile: backend/Dockerfile
+    container_name: grocery-celery-worker
+    command: celery -A backend.worker worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/grocery_planner
+      REDIS_URL: redis://redis:6379/0
+      LLM_API_URL: ${LLM_API_URL:-http://host.docker.internal:11434/api/generate}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-qwen2.5-coder:14b}
+    volumes:
+      - ./backend:/app
+      - ./.env:/app/.env:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Celery Beat for scheduled tasks
+  celery-beat:
+    build:
+      context: ../../Desktop/grocery-ai-planner
+      dockerfile: backend/Dockerfile
+    container_name: grocery-celery-beat
+    command: celery -A backend.worker beat --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/grocery_planner
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - ./.env:/app/.env:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: grocery-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - grocery-api
+
+  # Grafana for monitoring
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grocery-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# Usage:
+# Development: docker-compose up -d
+# Logs: docker-compose logs -f grocery-api
+# Database access: docker-compose exec postgres psql -U postgres -d grocery_planner
