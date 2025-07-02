@@ -12,7 +12,7 @@ AI-powered meal planning application that optimizes grocery shopping based on re
 ### 1. Setup Environment
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/divaadaan/grocery-ai-planner
 cd grocery-ai-planner
 
 # Copy environment template
@@ -393,80 +393,3 @@ pip list | grep opentelemetry
 # Verify metrics endpoint
 curl http://localhost:8001/metrics
 ```
-
-## 🎉 Day 1 Morning Tasks - COMPLETED ✅
-
-This boilerplate includes everything needed for Day 1 Morning:
-
-1. ✅ **Project Repository Structure** - Complete directory layout
-2. ✅ **Docker Compose Setup** - PostgreSQL + Redis + Full stack
-3. ✅ **Database Schema** - All SQLAlchemy models implemented
-4. ✅ **FastAPI Application** - Main app with health checks
-5. ✅ **Environment Configuration** - Complete settings management
-6. ✅ **Telemetry Integration** - Full OpenTelemetry setup
-7. ✅ **Background Jobs** - Celery workers and task structure
-8. ✅ **API Routes** - Basic endpoint structure ready
-
-### Next Steps (Day 1 Afternoon)
-1. Test database connectivity and basic CRUD operations
-2. Implement postal code input validation
-3. Set up first background job triggers
-4. Move to Day 2: Store discovery and scraping implementation
-
-### Quick Test Commands
-```bash
-# 1. Start the stack
-cd grocery-ai-planner
-cp .env.example .env
-# Edit LLM_API_URL in .env for your Ollama instance
-docker-compose up -d
-
-# 2. Test health
-curl http://localhost:8000/api/v1/health
-
-# 3. Test user creation
-curl -X POST "http://localhost:8000/api/v1/users/" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "postal_code": "M5V3A8", "budget": 150.0, "household_size": 2}'
-
-# 4. View API docs
-open http://localhost:8000/docs
-```
-
-The foundation is solid and ready for building your grocery AI meal planner! 🚀
-
----
-
-## 🆕 RECENT UPDATE: New Scraping Architecture
-
-**Major Change**: The scraping system has been completely redesigned!
-
-### What Changed?
-- **Removed Beautiful Soup** - Ineffective for modern JavaScript sites
-- **Added Flipp API integration** - Primary data source for Canadian grocery stores
-- **Selenium-first fallbacks** - Better handling of dynamic content
-- **Intelligent orchestration** - Automatic method selection and retry logic
-
-### New Scraping Endpoints
-```bash
-# Test all scraping methods
-curl -X POST http://localhost:8000/api/v1/scraping/test
-
-# Smart postal code scraping with Flipp integration
-curl -X POST http://localhost:8000/api/v1/scraping/postal-code \
-  -H "Content-Type: application/json" \
-  -d '{"postal_code": "M5V 3A8"}'
-
-# View results
-curl http://localhost:8000/api/v1/scraping/postal-codes/M5V%203A8/stores
-```
-
-### Benefits
-- **90% less scraping complexity** - One API covers hundreds of stores
-- **Better data quality** - Official retailer partnerships via Flipp
-- **Faster development** - Focus on AI agents instead of web scraping
-- **Nationwide coverage** - All major Canadian grocery chains included
-
-**For complete details, see `SCRAPING_UPDATE.md`**
-
-This update significantly improves the reliability and coverage of the grocery data collection system! 🎆
