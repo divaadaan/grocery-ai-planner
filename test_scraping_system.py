@@ -146,6 +146,43 @@ def test_database_models():
         print(f"❌ Database model test failed: {e}")
         return False
 
+def test_secrets():
+    """Test that Docker secrets are properly configured."""
+    print("\n🔐 Testing Docker secrets...")
+
+    try:
+        from core.secrets import SecretsManager
+
+        # Test secrets manager
+        available_secrets = SecretsManager.list_available_secrets()
+        print(f"✅ Secrets manager working, found {len(available_secrets)} secrets")
+
+        # Test required secrets
+        required_secrets = ['database_url', 'redis_url', 'secret_key', 'llm_api_url']
+        missing_secrets = []
+
+        for secret in required_secrets:
+            try:
+                value = SecretsManager.get_secret(secret)
+                if value:
+                    print(f"✅ {secret}: configured")
+                else:
+                    print(f"❌ {secret}: empty")
+                    missing_secrets.append(secret)
+            except Exception as e:
+                print(f"❌ {secret}: {str(e)}")
+                missing_secrets.append(secret)
+
+        if missing_secrets:
+            print(f"⚠️  Missing secrets: {missing_secrets}")
+            print("Run: ./scripts/setup-secrets.sh")
+            return False
+
+        return True
+    except ImportError as e:
+        print(f"❌ Secrets manager import failed: {e}")
+        return False
+
 def main():
     """Run all tests."""
     print("🚀 Testing New Scraping System")

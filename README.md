@@ -7,8 +7,15 @@ AI-powered meal planning application that optimizes grocery shopping based on re
 ### Prerequisites
 - Docker and Docker Compose
 - Ollama running locally (for LLM integration)
-- Python 3.11+ (for local development)
 
+### 0. Setup Secrets
+```bash
+# Generate secret files and templates
+./scripts/setup-secrets.sh
+
+# Edit secret files with your actual values
+nano secrets/database_url.txt
+nano secrets/llm_api_url.txt
 ### 1. Setup Environment
 ```bash
 # Clone the repository

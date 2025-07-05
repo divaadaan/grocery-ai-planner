@@ -1,3 +1,22 @@
+version: '3.8'
+
+# Define all secrets at the top level
+secrets:
+  database_url:
+    file: ./secrets/database_url.txt
+  redis_url:
+    file: ./secrets/redis_url.txt
+  secret_key:
+    file: ./secrets/secret_key.txt
+  llm_api_url:
+    file: ./secrets/llm_api_url.txt
+  google_maps_api_key:
+    file: ./secrets/google_maps_api_key.txt
+  mail_username:
+    file: ./secrets/mail_username.txt
+  mail_password:
+    file: ./secrets/mail_password.txt
+
 services:
   # PostgreSQL Database
   postgres:
@@ -36,47 +55,69 @@ services:
   # Main application
   grocery-api:
     build:
-      context: ../../Desktop/grocery-ai-planner
+      context: .
       dockerfile: backend/Dockerfile
     container_name: grocery-api
     ports:
       - "8000:8000"
       - "8001:8001"  # Prometheus metrics
+    secrets:
+      - database_url
+      - redis_url
+      - secret_key
+      - llm_api_url
+      - google_maps_api_key
+      - mail_username
+      - mail_password
     environment:
-      # Database
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/grocery_planner
-      
-      # Redis
-      REDIS_URL: redis://redis:6379/0
-      
-      # LLM Configuration
-      LLM_API_URL: ${LLM_API_URL:-http://host.docker.internal:11434/api/generate}
-      DEFAULT_MODEL: ${DEFAULT_MODEL:-qwen2.5-coder:14b}
-      
-      # Application
+      # Non-sensitive configuration only
       HOST: 0.0.0.0
       PORT: 8000
       LOG_LEVEL: INFO
       DEBUG: true
+      
+      # LLM
+      DEFAULT_MODEL: qwen2.5-coder:14b
       
       # Telemetry
       TELEMETRY_ENABLED: true
       TELEMETRY_METRICS_PORT: 8001
       TELEMETRY_CONSOLE_EXPORT: true
       
-      # External APIs (to be configured later)
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      # Email (non-sensitive)
+      MAIL_FROM: noreply@grocery-ai.local
+      MAIL_PORT: 587
+      MAIL_SERVER: smtp.gmail.com
+      MAIL_STARTTLS: true
+      MAIL_SSL_TLS: false
+      
+      # Scraping
+      MAX_SCRAPE_WORKERS: 3
+      SCRAPE_DELAY_MIN: 1
+      SCRAPE_DELAY_MAX: 3
+      USER_AGENT: GroceryAI-Bot/1.0
+      FLIPP_RATE_LIMIT_DELAY: 0.5
+      SCRAPING_TIMEOUT: 30
+      SELENIUM_HEADLESS: true
+      MAX_SCRAPING_RETRIES: 3
+      ENABLE_FLIPP_API: true
+      ENABLE_SELENIUM_FALLBACK: true
+      ENABLE_PDF_FALLBACK: false
+      ENABLE_VISION_FALLBACK: false
+      
+      # Jobs
+      CELERY_RESULT_EXPIRES: 3600
+      MAX_RETRIES: 3
       
     volumes:
       - ./backend:/app
-      - ./.env:/app/.env:ro
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -85,18 +126,27 @@ services:
   # Celery Worker for background tasks
   celery-worker:
     build:
-      context: ../../Desktop/grocery-ai-planner
+      context: .
       dockerfile: backend/Dockerfile
     container_name: grocery-celery-worker
-    command: celery -A backend.worker worker --loglevel=info
+    command: celery -A worker worker --loglevel=info
+    secrets:
+      - database_url
+      - redis_url
+      - llm_api_url
+      - google_maps_api_key
+      - mail_username
+      - mail_password
     environment:
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/grocery_planner
-      REDIS_URL: redis://redis:6379/0
-      LLM_API_URL: ${LLM_API_URL:-http://host.docker.internal:11434/api/generate}
-      DEFAULT_MODEL: ${DEFAULT_MODEL:-qwen2.5-coder:14b}
+      # Non-sensitive configuration only
+      DEFAULT_MODEL: qwen2.5-coder:14b
+      MAIL_FROM: noreply@grocery-ai.local
+      MAIL_PORT: 587
+      MAIL_SERVER: smtp.gmail.com
+      MAIL_STARTTLS: true
+      MAIL_SSL_TLS: false
     volumes:
       - ./backend:/app
-      - ./.env:/app/.env:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,16 +156,18 @@ services:
   # Celery Beat for scheduled tasks
   celery-beat:
     build:
-      context: ../../Desktop/grocery-ai-planner
+      context: .
       dockerfile: backend/Dockerfile
     container_name: grocery-celery-beat
-    command: celery -A backend.worker beat --loglevel=info
+    command: celery -A worker beat --loglevel=info
+    secrets:
+      - database_url
+      - redis_url
     environment:
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/grocery_planner
-      REDIS_URL: redis://redis:6379/0
+      # Minimal environment for beat scheduler
+      DEFAULT_MODEL: qwen2.5-coder:14b
     volumes:
       - ./backend:/app
-      - ./.env:/app/.env:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -165,6 +217,6 @@ volumes:
     driver: local
 
 # Usage:
-# Development: docker-compose up -d
-# Logs: docker-compose logs -f grocery-api
-# Database access: docker-compose exec postgres psql -U postgres -d grocery_planner
+# 1. Setup secrets: ./scripts/setup-secrets.sh
+# 2. Start services: docker-compose up -d
+# 3. Check logs: docker-compose logs -f grocery-api

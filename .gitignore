@@ -177,3 +177,8 @@ build/
 # Monitoring data
 prometheus_data/
 grafana_data/
+
+#docker secrets
+secrets/*.txt
+!secrets/.gitkeep
+!secrets/README.md

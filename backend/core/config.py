@@ -1,59 +1,46 @@
-# backend/core/config.py
 """
-Application configuration using Pydantic settings.
+Application configuration using Docker secrets and environment variables.
+Secrets for sensitive data, environment variables for non-sensitive config.
 """
 
-import os
 from functools import lru_cache
 from typing import Optional, List
 from pydantic import BaseSettings, Field
+from .secrets import SecretsManager
 
 
 class Settings(BaseSettings):
-    """Application settings with environment variable support."""
-    
-    # Application
+    """Application settings with Docker secrets for sensitive data."""
+
+    # Application (non-sensitive)
     app_name: str = "Grocery AI Planner"
     debug: bool = Field(default=False, env="DEBUG")
     host: str = Field(default="0.0.0.0", env="HOST")
     port: int = Field(default=8000, env="PORT")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
-    secret_key: str = Field(default="your-secret-key-change-in-production", env="SECRET_KEY")
-    
-    # Database
-    database_url: str = Field(env="DATABASE_URL")
-    
-    # Redis
-    redis_url: str = Field(env="REDIS_URL")
-    
-    # LLM Configuration
-    llm_api_url: str = Field(env="LLM_API_URL")
+
+    # LLM Configuration (non-sensitive model name)
     default_model: str = Field(default="qwen2.5-coder:14b", env="DEFAULT_MODEL")
-    
-    # Telemetry
+
+    # Telemetry (non-sensitive)
     telemetry_enabled: bool = Field(default=True, env="TELEMETRY_ENABLED")
     telemetry_metrics_port: int = Field(default=8001, env="TELEMETRY_METRICS_PORT")
     telemetry_console_export: bool = Field(default=False, env="TELEMETRY_CONSOLE_EXPORT")
-    
-    # External APIs
-    google_maps_api_key: Optional[str] = Field(default=None, env="GOOGLE_MAPS_API_KEY")
-    
-    # Email Configuration
-    mail_username: Optional[str] = Field(default=None, env="MAIL_USERNAME")
-    mail_password: Optional[str] = Field(default=None, env="MAIL_PASSWORD")
+
+    # Email Configuration (non-sensitive settings)
     mail_from: Optional[str] = Field(default=None, env="MAIL_FROM")
     mail_port: int = Field(default=587, env="MAIL_PORT")
     mail_server: Optional[str] = Field(default=None, env="MAIL_SERVER")
     mail_starttls: bool = Field(default=True, env="MAIL_STARTTLS")
     mail_ssl_tls: bool = Field(default=False, env="MAIL_SSL_TLS")
-    
-    # Scraping Configuration
+
+    # Scraping Configuration (non-sensitive)
     max_scrape_workers: int = Field(default=3, env="MAX_SCRAPE_WORKERS")
     scrape_delay_min: int = Field(default=1, env="SCRAPE_DELAY_MIN")
     scrape_delay_max: int = Field(default=3, env="SCRAPE_DELAY_MAX")
     user_agent: str = Field(default="GroceryAI-Bot/1.0", env="USER_AGENT")
-    
-    # New Scraping System Configuration
+
+    # New Scraping System Configuration (non-sensitive)
     flipp_rate_limit_delay: float = Field(default=0.5, env="FLIPP_RATE_LIMIT_DELAY")
     scraping_timeout: int = Field(default=30, env="SCRAPING_TIMEOUT")
     selenium_headless: bool = Field(default=True, env="SELENIUM_HEADLESS")
@@ -62,19 +49,54 @@ class Settings(BaseSettings):
     enable_selenium_fallback: bool = Field(default=True, env="ENABLE_SELENIUM_FALLBACK")
     enable_pdf_fallback: bool = Field(default=False, env="ENABLE_PDF_FALLBACK")
     enable_vision_fallback: bool = Field(default=False, env="ENABLE_VISION_FALLBACK")
-    
-    # Job Configuration
+
+    # Job Configuration (non-sensitive)
     celery_result_expires: int = Field(default=3600, env="CELERY_RESULT_EXPIRES")
     max_retries: int = Field(default=3, env="MAX_RETRIES")
-    
-    # CORS
+
+    # CORS (non-sensitive)
     allowed_origins: List[str] = Field(
         default=["http://localhost:3000", "http://127.0.0.1:3000"],
         env="ALLOWED_ORIGINS"
     )
 
+    # Sensitive data from Docker secrets
+    @property
+    def database_url(self) -> str:
+        """Get database URL from Docker secret."""
+        return SecretsManager.get_secret("database_url")
+
+    @property
+    def redis_url(self) -> str:
+        """Get Redis URL from Docker secret."""
+        return SecretsManager.get_secret("redis_url")
+
+    @property
+    def secret_key(self) -> str:
+        """Get application secret key from Docker secret."""
+        return SecretsManager.get_secret("secret_key")
+
+    @property
+    def llm_api_url(self) -> str:
+        """Get LLM API URL from Docker secret."""
+        return SecretsManager.get_secret("llm_api_url")
+
+    @property
+    def google_maps_api_key(self) -> Optional[str]:
+        """Get Google Maps API key from Docker secret."""
+        return SecretsManager.get_optional_secret("google_maps_api_key")
+
+    @property
+    def mail_password(self) -> Optional[str]:
+        """Get mail password from Docker secret."""
+        return SecretsManager.get_optional_secret("mail_password")
+
+    @property
+    def mail_username(self) -> Optional[str]:
+        """Get mail username from Docker secret."""
+        return SecretsManager.get_optional_secret("mail_username")
+
     class Config:
-        env_file = ".env"
         case_sensitive = False
 
 
@@ -84,21 +106,17 @@ def get_settings() -> Settings:
     return Settings()
 
 
-# Database configuration
+# Helper functions remain the same but use properties
 def get_database_url() -> str:
-    """Get database URL with fallback."""
-    settings = get_settings()
-    return settings.database_url
+    """Get database URL."""
+    return get_settings().database_url
 
 
-# Redis configuration  
 def get_redis_url() -> str:
-    """Get Redis URL with fallback."""
-    settings = get_settings()
-    return settings.redis_url
+    """Get Redis URL."""
+    return get_settings().redis_url
 
 
-# Celery configuration
 def get_celery_config() -> dict:
     """Get Celery configuration."""
     settings = get_settings()
@@ -117,7 +135,6 @@ def get_celery_config() -> dict:
     }
 
 
-# Scraping configuration
 def get_scraping_config() -> dict:
     """Get scraping system configuration."""
     settings = get_settings()

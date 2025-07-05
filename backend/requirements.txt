@@ -19,7 +19,7 @@ langgraph>=0.0.30
 langchain>=0.1.0
 langchain-community>=0.0.10
 
-# LLM Integration (keeping your existing approach)
+# LLM Integration
 requests>=2.31.0
 
 # Environment & Configuration
@@ -35,10 +35,10 @@ opentelemetry-instrumentation-fastapi>=0.46b0
 opentelemetry-instrumentation-requests>=0.46b0
 prometheus-client>=0.19.0
 
-# Web Scraping & Tools (Selenium-first approach)
+# Web Scraping & Tools
 selenium>=4.15.0
 webdriver-manager>=4.0.0
-playwright>=1.40.0  # Keep for advanced cases
+playwright>=1.40.0
 lxml>=4.9.0
 
 # File Processing
